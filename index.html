@@ -3,38 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Online Chess - Fullscreen</title>
+    <title>Live Online Chess</title>
     <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Chess.js for game logic and rule validation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
         .piece {
-            font-size: clamp(2rem, 9.5vw, 4.5rem);
+            font-size: clamp(2rem, 8vw, 3.8rem);
             cursor: pointer;
             user-select: none;
             transition: transform 0.08s ease;
+            line-height: 1;
         }
         .piece:hover {
             transform: scale(1.12);
+        }
+        /* Fixed Grid layout guarantees squares never stretch */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 100%;
+            max-width: min(92vw, 480px);
+            aspect-ratio: 1 / 1;
         }
         .square {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 12.5%;
-            aspect-ratio: 1;
-            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            user-select: none;
         }
         .light { background-color: #f0d9b5; }
         .dark { background-color: #b58863; }
         .selected { background-color: #7b61ff !important; }
     </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
+<body class="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-between p-3 select-none">
 
     <!-- Top Header / Status bar -->
-    <div class="w-full max-w-lg flex flex-col gap-1 px-1">
+    <div class="w-full max-w-md flex flex-col gap-1 px-1">
         <div class="flex justify-between items-center">
             <h1 class="text-lg sm:text-xl font-bold tracking-tight">Live Chess</h1>
             <div class="bg-slate-800 px-2.5 py-1 rounded-md text-xs sm:text-sm text-slate-200 border border-slate-700">
@@ -47,11 +57,11 @@
         </div>
     </div>
 
-    <!-- Chessboard Container (Fit screen, full width, perfectly square) -->
-    <div class="w-full max-w-[min(92vw,520px)] aspect-square flex flex-wrap rounded-xl overflow-hidden border-4 border-slate-800 shadow-2xl my-2" id="board"></div>
+    <!-- Chessboard Container (Strictly square via CSS Grid) -->
+    <div id="board" class="rounded-xl overflow-hidden border-4 border-slate-800 shadow-2xl my-auto"></div>
 
     <!-- Bottom Controls -->
-    <div class="w-full max-w-lg flex justify-between items-center px-1 pb-1">
+    <div class="w-full max-w-md flex justify-between items-center px-1 pb-1">
         <p class="text-xs text-slate-400">Moves sync automatically.</p>
         <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer shadow-lg active:scale-95">
             Restart Game
@@ -78,7 +88,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
-        // Firestore Document Reference
         const gameDocRef = doc(db, "chess_matches", "room_1");
 
         const chess = new Chess();
@@ -90,13 +99,11 @@
         const statusElement = document.getElementById('status');
         const pingCountElement = document.getElementById('pingCount');
 
-        // Unicode chess symbols mapping
         const unicodePieces = {
             p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
             P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
         };
 
-        // Render the board instantly on UI
         function renderBoard() {
             boardElement.innerHTML = '';
             const board = chess.board();
@@ -127,7 +134,6 @@
             updateStatus();
         }
 
-        // Update status text
         function updateStatus() {
             let status = '';
             let moveColor = chess.turn() === 'w' ? 'White' : 'Black';
@@ -145,7 +151,6 @@
             statusElement.textContent = status;
         }
 
-        // Handle square selection & moves instantly
         async function handleSquareClick(square) {
             if (selectedSquare === null) {
                 const piece = chess.get(square);
@@ -178,7 +183,6 @@
                         pingCountElement.textContent = currentTouchCount;
                     } catch (error) {
                         console.error("Error writing move to Firestore:", error);
-                        alert("Failed to sync move to database.");
                     } finally {
                         setTimeout(() => { isLocallyMoving = false; }, 300);
                     }
@@ -192,7 +196,6 @@
             }
         }
 
-        // Initialize Firestore connection & smooth listener
         async function initFirestore() {
             try {
                 const docSnap = await getDoc(gameDocRef);
@@ -220,20 +223,12 @@
                             renderBoard();
                         }
                     }
-                }, (error) => {
-                    console.error("Firestore subscription error:", error);
-                    statusElement.textContent = "Sync error (Check rules)";
-                    statusElement.className = "font-semibold text-red-400";
                 });
-
             } catch (err) {
                 console.error("Initialization error:", err);
-                statusElement.textContent = "Offline mode";
-                statusElement.className = "font-semibold text-amber-400";
             }
         }
 
-        // Restart button handler
         document.getElementById('restartBtn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to restart the game?")) {
                 chess.reset();
@@ -257,7 +252,6 @@
             }
         });
 
-        // Initial render & connection
         renderBoard();
         initFirestore();
     </script>
