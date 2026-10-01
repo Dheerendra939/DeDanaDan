@@ -19,15 +19,15 @@
         .piece:hover {
             transform: scale(1.12);
         }
-        /* Style White pieces: crisp white with a subtle dark shadow */
+        /* Style White pieces: crisp full solid white with dark shadow for contrast */
         .piece-w {
             color: #ffffff;
-            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7));
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8));
         }
-        /* Style Black pieces: solid filled black with a subtle light outline/shadow for contrast */
+        /* Style Black pieces: solid filled black with a light outline/shadow for contrast */
         .piece-b {
             color: #000000;
-            filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.4));
+            filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.5));
         }
         /* Maximized square board layout filling screen width/height cleanly */
         #board {
@@ -35,7 +35,7 @@
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
             width: 100vw;
-            max-width: min(98vw, 92vh);
+            max-width: min(98vw, 90vh);
             aspect-ratio: 1 / 1;
         }
         .square {
@@ -53,21 +53,26 @@
 </head>
 <body class="bg-slate-950 text-white h-screen flex flex-col items-center justify-between py-2 px-1 select-none overflow-hidden">
 
-    <!-- Top Header / Status bar -->
-    <div class="w-full max-w-[min(98vw,92vh)] flex justify-between items-center px-1">
-        <h1 class="text-base sm:text-xl font-bold tracking-tight">Live Chess</h1>
-        <span id="status" class="text-xs sm:text-sm font-semibold text-emerald-400">Ready to play</span>
+    <!-- Top Header with Status and Restart Button -->
+    <div class="w-full max-w-[min(98vw,90vh)] flex flex-col gap-1 px-1">
+        <div class="flex justify-between items-center">
+            <h1 class="text-base sm:text-xl font-bold tracking-tight">Live Chess</h1>
+            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition cursor-pointer shadow-md active:scale-95">
+                Restart Game
+            </button>
+        </div>
+        <div class="flex justify-between items-center">
+            <span id="status" class="text-xs sm:text-sm font-semibold text-emerald-400">Ready to play</span>
+            <span class="text-[11px] text-slate-400">Share link to play live</span>
+        </div>
     </div>
 
     <!-- Chessboard Container (Edge-to-edge max fit) -->
     <div id="board" class="rounded-lg overflow-hidden border-2 border-slate-800 shadow-2xl my-auto"></div>
 
-    <!-- Bottom Controls -->
-    <div class="w-full max-w-[min(98vw,92vh)] flex justify-between items-center px-1">
-        <p class="text-[11px] text-slate-400">Share link to play live.</p>
-        <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition cursor-pointer shadow-lg active:scale-95">
-            Restart Game
-        </button>
+    <!-- Bottom minimalist footer -->
+    <div class="w-full max-w-[min(98vw,90vh)] text-center pb-1">
+        <p class="text-[11px] text-slate-500">Moves sync live automatically via Firestore.</p>
     </div>
 
     <!-- Firebase Firestore & Game Logic -->
@@ -118,7 +123,6 @@
                     const piece = board[r][c];
                     if (piece) {
                         const pieceSpan = document.createElement('span');
-                        // Assign class piece-w for white pieces, piece-b for black pieces
                         const colorClass = piece.color === 'w' ? 'piece-w' : 'piece-b';
                         pieceSpan.className = `piece ${colorClass}`;
                         pieceSpan.textContent = unicodePieces[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
