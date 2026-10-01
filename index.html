@@ -19,12 +19,12 @@
         .piece:hover {
             transform: scale(1.12);
         }
-        /* Fully filled bright solid white pieces with a dark outline shadow for depth */
+        /* Fully filled bright solid white pieces */
         .piece-w {
             color: #ffffff !important;
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8);
         }
-        /* Solid filled black pieces with a light shadow */
+        /* Solid filled black pieces */
         .piece-b {
             color: #000000 !important;
             text-shadow: -1px -1px 0 rgba(255,255,255,0.4), 1px -1px 0 rgba(255,255,255,0.4), -1px 1px 0 rgba(255,255,255,0.4), 1px 1px 0 rgba(255,255,255,0.4);
@@ -53,13 +53,18 @@
 </head>
 <body class="bg-slate-950 text-white h-screen flex flex-col items-center justify-between py-2 px-1 select-none overflow-hidden">
 
-    <!-- Top Header with Status and Restart Button -->
+    <!-- Top Header with Status, Flip, and Restart Buttons -->
     <div class="w-full max-w-[min(98vw,90vh)] flex flex-col gap-1 px-1">
         <div class="flex justify-between items-center">
             <h1 class="text-base sm:text-xl font-bold tracking-tight">Live Chess</h1>
-            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition cursor-pointer shadow-md active:scale-95">
-                Restart Game
-            </button>
+            <div class="flex gap-2">
+                <button id="flipBtn" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium transition cursor-pointer shadow-md active:scale-95">
+                    Flip Board
+                </button>
+                <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition cursor-pointer shadow-md active:scale-95">
+                    Restart
+                </button>
+            </div>
         </div>
         <div class="flex justify-between items-center">
             <span id="status" class="text-xs sm:text-sm font-semibold text-emerald-400">Ready to play</span>
@@ -100,11 +105,11 @@
         const chess = new Chess();
         let selectedSquare = null;
         let isLocallyMoving = false;
+        let isFlipped = false; // Local board orientation flag
 
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status');
 
-        // Using solid filled chess symbols for both white and black sets to guarantee full fill
         const unicodePieces = {
             p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
             P: '♟', R: '♜', N: '♞', B: '♝', Q: '♛', K: '♚'
@@ -114,8 +119,17 @@
             boardElement.innerHTML = '';
             const board = chess.board();
 
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
+            // Determine loop direction based on local flip state
+            let rows = [0, 1, 2, 3, 4, 5, 6, 7];
+            let cols = [0, 1, 2, 3, 4, 5, 6, 7];
+
+            if (isFlipped) {
+                rows.reverse();
+                cols.reverse();
+            }
+
+            for (let r of rows) {
+                for (let c of cols) {
                     const squareId = String.fromCharCode(97 + c) + (8 - r);
                     const squareDiv = document.createElement('div');
                     squareDiv.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
@@ -224,6 +238,14 @@
             }
         }
 
+        // Flip Board Toggle Button Handler
+        document.getElementById('flipBtn').addEventListener('click', () => {
+            isFlipped = !isFlipped;
+            selectedSquare = null;
+            renderBoard();
+        });
+
+        // Restart Button Handler
         document.getElementById('restartBtn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to restart the game?")) {
                 chess.reset();
