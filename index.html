@@ -37,7 +37,7 @@
         
         <!-- Connection Status & Ping Counter -->
         <div class="w-full flex justify-between items-center mb-3 text-xs sm:text-sm text-slate-300 px-1">
-            <span id="status" class="font-semibold text-amber-400">Initializing board...</span>
+            <span id="status" class="font-semibold text-emerald-400">Ready to play</span>
             <div class="bg-slate-700 px-2 py-1 rounded text-slate-200 border border-slate-600">
                 DB Pings: <span id="pingCount" class="font-bold text-amber-400">0</span>
             </div>
@@ -92,7 +92,7 @@
             P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
         };
 
-        // Render the board on the UI
+        // Render the board on the UI immediately
         function renderBoard() {
             boardElement.innerHTML = '';
             const board = chess.board();
@@ -139,7 +139,6 @@
                 }
             }
             statusElement.textContent = status;
-            statusElement.className = "font-semibold text-emerald-400";
         }
 
         // Handle square selection & moves
@@ -171,7 +170,7 @@
                         pingCountElement.textContent = currentTouchCount;
                     } catch (error) {
                         console.error("Error writing move to Firestore:", error);
-                        alert("Failed to sync move. Check your Firebase Firestore Rules.");
+                        alert("Failed to sync move. Please verify your Firestore security rules.");
                     }
                 } else {
                     const piece = chess.get(square);
@@ -183,14 +182,13 @@
             }
         }
 
-        // Initialize and listen to Firestore
-        async function initGame() {
+        // Initialize Firestore connection & live listener in the background
+        async function initFirestore() {
             try {
-                // Check if document exists
                 const docSnap = await getDoc(gameDocRef);
                 
                 if (!docSnap.exists()) {
-                    // Create default document if it doesn't exist
+                    // Auto-create document with default starting FEN if it doesn't exist
                     await setDoc(gameDocRef, {
                         fen: chess.fen(),
                         lastUpdated: Date.now(),
@@ -198,7 +196,7 @@
                     });
                 }
 
-                // Setup live listener
+                // Setup live listener for opponent moves / updates
                 onSnapshot(gameDocRef, (docSnapshot) => {
                     if (docSnapshot.exists()) {
                         const data = docSnapshot.data();
@@ -216,16 +214,14 @@
                     }
                 }, (error) => {
                     console.error("Firestore subscription error:", error);
-                    statusElement.textContent = "Firestore sync error (Check rules)";
+                    statusElement.textContent = "Sync error (Check rules)";
                     statusElement.className = "font-semibold text-red-400";
                 });
 
-                renderBoard();
             } catch (err) {
                 console.error("Initialization error:", err);
-                statusElement.textContent = "Failed to connect to Firestore";
-                statusElement.className = "font-semibold text-red-400";
-                renderBoard(); // Render board locally anyway
+                statusElement.textContent = "Offline mode (Firestore unreachable)";
+                statusElement.className = "font-semibold text-amber-400";
             }
         }
 
@@ -244,11 +240,15 @@
                 } catch (error) {
                     console.error("Error resetting game:", error);
                 }
+                renderBoard();
             }
         });
 
-        // Run setup on page load
-        initGame();
+        // 1. Render board immediately on page load
+        renderBoard();
+
+        // 2. Connect to Firestore in background
+        initFirestore();
     </script>
 </body>
 </html>
