@@ -19,16 +19,15 @@
         .piece:hover {
             transform: scale(1.12);
         }
-        /* Fully filled bright solid white pieces with a strong shadow for contrast */
+        /* Fully filled bright solid white pieces with a dark outline shadow for depth */
         .piece-w {
             color: #ffffff !important;
-            text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.7);
-            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8);
         }
-        /* Solid filled black pieces */
+        /* Solid filled black pieces with a light shadow */
         .piece-b {
             color: #000000 !important;
-            filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.4));
+            text-shadow: -1px -1px 0 rgba(255,255,255,0.4), 1px -1px 0 rgba(255,255,255,0.4), -1px 1px 0 rgba(255,255,255,0.4), 1px 1px 0 rgba(255,255,255,0.4);
         }
         /* Maximized square board layout filling screen width/height cleanly */
         #board {
@@ -105,9 +104,10 @@
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status');
 
+        // Using solid filled chess symbols for both white and black sets to guarantee full fill
         const unicodePieces = {
             p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
-            P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
+            P: '♟', R: '♜', N: '♞', B: '♝', Q: '♛', K: '♚'
         };
 
         function renderBoard() {
@@ -126,7 +126,7 @@
                         const pieceSpan = document.createElement('span');
                         const colorClass = piece.color === 'w' ? 'piece-w' : 'piece-b';
                         pieceSpan.className = `piece ${colorClass}`;
-                        pieceSpan.textContent = unicodePieces[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+                        pieceSpan.textContent = unicodePieces[piece.type];
                         squareDiv.appendChild(pieceSpan);
                     }
 
