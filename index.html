@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Chess Match</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Online Chess Match - Firestore</title>
     <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Chess.js for game logic and rule validation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
         .piece {
-            font-size: 2.75rem;
+            font-size: clamp(2rem, 8vw, 3.5rem);
             cursor: pointer;
             user-select: none;
             transition: transform 0.1s ease;
@@ -28,35 +28,37 @@
         .light { background-color: #f0d9b5; }
         .dark { background-color: #b58863; }
         .selected { background-color: #7b61ff !important; }
-        .highlight { background-color: #81b64c !important; }
     </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
 
-    <div class="max-w-md w-full bg-slate-800 rounded-xl shadow-2xl p-6 border border-slate-700">
-        <h1 class="text-2xl font-bold text-center mb-2">Live Online Chess</h1>
+    <div class="w-full max-w-lg bg-slate-800 rounded-xl shadow-2xl p-4 sm:p-6 border border-slate-700 flex flex-col items-center">
+        <h1 class="text-xl sm:text-2xl font-bold text-center mb-1">Live Online Chess</h1>
         
-        <!-- Status & Room Info -->
-        <div class="flex justify-between items-center mb-4 text-sm text-slate-300">
-            <span id="status" class="font-semibold text-emerald-400">Connecting to game...</span>
-            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium transition cursor-pointer">
+        <!-- Connection Ping Counter & Status -->
+        <div class="w-full flex justify-between items-center mb-3 text-xs sm:text-sm text-slate-300 px-1">
+            <span id="status" class="font-semibold text-emerald-400">Connecting...</span>
+            <div class="bg-slate-700 px-2 py-1 rounded text-slate-200 border border-slate-600">
+                DB Pings: <span id="pingCount" class="font-bold text-amber-400">0</span>
+            </div>
+        </div>
+
+        <!-- Chessboard Container (Maximum responsive width) -->
+        <div id="board" class="w-full max-w-[480px] aspect-square flex flex-wrap rounded-lg overflow-hidden border-4 border-slate-700 shadow-inner"></div>
+
+        <!-- Controls -->
+        <div class="w-full flex justify-between items-center mt-4 px-1">
+            <p class="text-xs text-slate-400">Share this page with your friend.</p>
+            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-medium transition cursor-pointer shadow">
                 Restart Game
             </button>
         </div>
-
-        <!-- Chessboard Container -->
-        <div id="board" class="w-full aspect-square flex flex-wrap rounded-lg overflow-hidden border-4 border-slate-700 shadow-inner"></div>
-
-        <!-- Instructions -->
-        <p class="text-xs text-slate-400 text-center mt-4">
-            Share this page URL with your friend. Moves sync live instantly!
-        </p>
     </div>
 
-    <!-- Firebase & Game Logic -->
+    <!-- Firebase Firestore & Game Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Your Firebase Configuration
         const firebaseConfig = {
@@ -71,13 +73,16 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const gameRef = ref(db, 'chess_matches/room_1');
+        const db = getFirestore(app);
+        
+        // Firestore Document Reference for the current game
+        const gameDocRef = doc(db, "chess_matches", "room_1");
 
         const chess = new Chess();
         let selectedSquare = null;
-        let boardElement = document.getElementById('board');
-        let statusElement = document.getElementById('status');
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const pingCountElement = document.getElementById('pingCount');
 
         // Unicode chess symbols mapping
         const unicodePieces = {
@@ -128,14 +133,14 @@
             } else {
                 status = `${moveColor}'s turn`;
                 if (chess.in_check()) {
-                    status += ` (${moveColor} is in CHECK!)`;
+                    status += ` (${moveColor} in CHECK!)`;
                 }
             }
             statusElement.textContent = status;
         }
 
         // Handle square selection & moves
-        function handleSquareClick(square) {
+        async function handleSquareClick(square) {
             if (selectedSquare === null) {
                 const piece = chess.get(square);
                 if (piece && piece.color === chess.turn()) {
@@ -146,19 +151,23 @@
                 const move = chess.move({
                     from: selectedSquare,
                     to: square,
-                    promotion: 'q' // auto promote to queen for simplicity
+                    promotion: 'q' // auto promote to queen
                 });
 
                 selectedSquare = null;
 
                 if (move) {
-                    // Push the new FEN state to Firebase
-                    set(gameRef, {
-                        fen: chess.fen(),
-                        lastUpdated: Date.now()
-                    });
+                    try {
+                        // Push updated FEN state to Firestore (overwrites current room state)
+                        await setDoc(gameDocRef, {
+                            fen: chess.fen(),
+                            lastUpdated: Date.now(),
+                            touchCount: (window.currentTouchCount || 0) + 1
+                        });
+                    } catch (error) {
+                        console.error("Error writing move to Firestore:", error);
+                    }
                 } else {
-                    // If invalid move, check if user clicked another own piece to switch selection
                     const piece = chess.get(square);
                     if (piece && piece.color === chess.turn()) {
                         selectedSquare = square;
@@ -168,29 +177,50 @@
             }
         }
 
-        // Listen for live changes from Firebase
-        onValue(gameRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data && data.fen) {
-                if (data.fen !== chess.fen()) {
+        // Real-time listener using Firestore onSnapshot
+        onSnapshot(gameDocRef, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const data = docSnapshot.data();
+                
+                // Update touch / sync counter for connection test
+                if (data.touchCount !== undefined) {
+                    window.currentTouchCount = data.touchCount;
+                    pingCountElement.textContent = data.touchCount;
+                }
+
+                // Update chess board if FEN changed from remote move or restart
+                if (data.fen && data.fen !== chess.fen()) {
                     chess.load(data.fen);
                     selectedSquare = null;
                     renderBoard();
                 }
             } else {
-                // Initialize room if empty
-                set(gameRef, { fen: chess.fen(), lastUpdated: Date.now() });
+                // Initialize room document if it doesn't exist yet
+                setDoc(gameDocRef, {
+                    fen: chess.fen(),
+                    lastUpdated: Date.now(),
+                    touchCount: 1
+                });
             }
+        }, (error) => {
+            console.error("Firestore subscription error:", error);
+            statusElement.textContent = "Connection error!";
+            statusElement.className = "font-semibold text-red-400";
         });
 
         // Restart button handler
-        document.getElementById('restartBtn').addEventListener('click', () => {
+        document.getElementById('restartBtn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to restart the game?")) {
                 chess.reset();
-                set(gameRef, {
-                    fen: chess.fen(),
-                    lastUpdated: Date.now()
-                });
+                try {
+                    await setDoc(gameDocRef, {
+                        fen: chess.fen(),
+                        lastUpdated: Date.now(),
+                        touchCount: (window.currentTouchCount || 0) + 1
+                    });
+                } catch (error) {
+                    console.error("Error resetting game:", error);
+                }
             }
         });
     </script>
