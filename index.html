@@ -35,20 +35,20 @@
     <div class="w-full max-w-lg bg-slate-800 rounded-xl shadow-2xl p-4 sm:p-6 border border-slate-700 flex flex-col items-center">
         <h1 class="text-xl sm:text-2xl font-bold text-center mb-1">Live Online Chess</h1>
         
-        <!-- Connection Ping Counter & Status -->
+        <!-- Connection Status & Ping Counter -->
         <div class="w-full flex justify-between items-center mb-3 text-xs sm:text-sm text-slate-300 px-1">
-            <span id="status" class="font-semibold text-emerald-400">Connecting...</span>
+            <span id="status" class="font-semibold text-amber-400">Initializing board...</span>
             <div class="bg-slate-700 px-2 py-1 rounded text-slate-200 border border-slate-600">
                 DB Pings: <span id="pingCount" class="font-bold text-amber-400">0</span>
             </div>
         </div>
 
-        <!-- Chessboard Container (Maximum responsive width) -->
+        <!-- Chessboard Container -->
         <div id="board" class="w-full max-w-[480px] aspect-square flex flex-wrap rounded-lg overflow-hidden border-4 border-slate-700 shadow-inner"></div>
 
         <!-- Controls -->
         <div class="w-full flex justify-between items-center mt-4 px-1">
-            <p class="text-xs text-slate-400">Share this page with your friend.</p>
+            <p class="text-xs text-slate-400">Share link with your friend to play.</p>
             <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-medium transition cursor-pointer shadow">
                 Restart Game
             </button>
@@ -58,7 +58,7 @@
     <!-- Firebase Firestore & Game Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Your Firebase Configuration
         const firebaseConfig = {
@@ -75,11 +75,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
-        // Firestore Document Reference for the current game
+        // Firestore Document Reference: collection "chess_matches", document "room_1"
         const gameDocRef = doc(db, "chess_matches", "room_1");
 
         const chess = new Chess();
         let selectedSquare = null;
+        let currentTouchCount = 0;
+
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status');
         const pingCountElement = document.getElementById('pingCount');
@@ -137,6 +139,7 @@
                 }
             }
             statusElement.textContent = status;
+            statusElement.className = "font-semibold text-emerald-400";
         }
 
         // Handle square selection & moves
@@ -151,21 +154,24 @@
                 const move = chess.move({
                     from: selectedSquare,
                     to: square,
-                    promotion: 'q' // auto promote to queen
+                    promotion: 'q'
                 });
 
                 selectedSquare = null;
 
                 if (move) {
                     try {
-                        // Push updated FEN state to Firestore (overwrites current room state)
+                        currentTouchCount++;
+                        // Update FEN and touch count in Firestore
                         await setDoc(gameDocRef, {
                             fen: chess.fen(),
                             lastUpdated: Date.now(),
-                            touchCount: (window.currentTouchCount || 0) + 1
+                            touchCount: currentTouchCount
                         });
+                        pingCountElement.textContent = currentTouchCount;
                     } catch (error) {
                         console.error("Error writing move to Firestore:", error);
+                        alert("Failed to sync move. Check your Firebase Firestore Rules.");
                     }
                 } else {
                     const piece = chess.get(square);
@@ -177,52 +183,72 @@
             }
         }
 
-        // Real-time listener using Firestore onSnapshot
-        onSnapshot(gameDocRef, (docSnapshot) => {
-            if (docSnapshot.exists()) {
-                const data = docSnapshot.data();
+        // Initialize and listen to Firestore
+        async function initGame() {
+            try {
+                // Check if document exists
+                const docSnap = await getDoc(gameDocRef);
                 
-                // Update touch / sync counter for connection test
-                if (data.touchCount !== undefined) {
-                    window.currentTouchCount = data.touchCount;
-                    pingCountElement.textContent = data.touchCount;
+                if (!docSnap.exists()) {
+                    // Create default document if it doesn't exist
+                    await setDoc(gameDocRef, {
+                        fen: chess.fen(),
+                        lastUpdated: Date.now(),
+                        touchCount: 1
+                    });
                 }
 
-                // Update chess board if FEN changed from remote move or restart
-                if (data.fen && data.fen !== chess.fen()) {
-                    chess.load(data.fen);
-                    selectedSquare = null;
-                    renderBoard();
-                }
-            } else {
-                // Initialize room document if it doesn't exist yet
-                setDoc(gameDocRef, {
-                    fen: chess.fen(),
-                    lastUpdated: Date.now(),
-                    touchCount: 1
+                // Setup live listener
+                onSnapshot(gameDocRef, (docSnapshot) => {
+                    if (docSnapshot.exists()) {
+                        const data = docSnapshot.data();
+                        
+                        if (data.touchCount !== undefined) {
+                            currentTouchCount = data.touchCount;
+                            pingCountElement.textContent = currentTouchCount;
+                        }
+
+                        if (data.fen && data.fen !== chess.fen()) {
+                            chess.load(data.fen);
+                            selectedSquare = null;
+                            renderBoard();
+                        }
+                    }
+                }, (error) => {
+                    console.error("Firestore subscription error:", error);
+                    statusElement.textContent = "Firestore sync error (Check rules)";
+                    statusElement.className = "font-semibold text-red-400";
                 });
+
+                renderBoard();
+            } catch (err) {
+                console.error("Initialization error:", err);
+                statusElement.textContent = "Failed to connect to Firestore";
+                statusElement.className = "font-semibold text-red-400";
+                renderBoard(); // Render board locally anyway
             }
-        }, (error) => {
-            console.error("Firestore subscription error:", error);
-            statusElement.textContent = "Connection error!";
-            statusElement.className = "font-semibold text-red-400";
-        });
+        }
 
         // Restart button handler
         document.getElementById('restartBtn').addEventListener('click', async () => {
             if (confirm("Are you sure you want to restart the game?")) {
                 chess.reset();
                 try {
+                    currentTouchCount++;
                     await setDoc(gameDocRef, {
                         fen: chess.fen(),
                         lastUpdated: Date.now(),
-                        touchCount: (window.currentTouchCount || 0) + 1
+                        touchCount: currentTouchCount
                     });
+                    pingCountElement.textContent = currentTouchCount;
                 } catch (error) {
                     console.error("Error resetting game:", error);
                 }
             }
         });
+
+        // Run setup on page load
+        initGame();
     </script>
 </body>
 </html>
