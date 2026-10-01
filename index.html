@@ -1,210 +1,198 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>दे दना दन - विज्ञापन देखो और ₹5 कमाओ</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Canvas Confetti -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <!-- Monetag Rewarded Interstitial SDK (Zone: 11672341) -->
-  <script src="//libtl.com/sdk.js" data-zone="11672341" data-sdk="show_11672341"></script>
-  <style>
-    @keyframes pulseGlow {
-      0%, 100% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.6); }
-      50% { box-shadow: 0 0 30px rgba(234, 179, 8, 0.95); transform: scale(1.02); }
-    }
-    .pulse-glow { animation: pulseGlow 1.5s infinite; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Chess Match</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Chess.js for game logic and rule validation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        .piece {
+            font-size: 2.75rem;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s ease;
+        }
+        .piece:hover {
+            transform: scale(1.1);
+        }
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 12.5%;
+            aspect-ratio: 1;
+        }
+        .light { background-color: #f0d9b5; }
+        .dark { background-color: #b58863; }
+        .selected { background-color: #7b61ff !important; }
+        .highlight { background-color: #81b64c !important; }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-amber-500 via-orange-600 to-red-700 min-h-screen text-slate-900 font-sans p-4 flex items-center justify-center">
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-  <div id="quiz-container" class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full p-6 border border-amber-200">
-    
-    <!-- Top Header -->
-    <div class="text-center mb-5 pb-4 border-b border-amber-100">
-      <div class="inline-flex items-center gap-2 bg-amber-100 text-amber-900 px-3 py-1 rounded-full text-xs font-bold mb-2">
-        <span>🎬 Monetag Rewarded Ad</span> • <span>इनाम: ₹5 प्रति क्विज</span>
-      </div>
-      <h1 class="text-2xl font-black text-amber-600">🏆 दे दना दन</h1>
-      <p class="text-xs text-gray-500">5 सवाल + विज्ञापन पूरे करें और ₹5 तुरंत पाएं!</p>
-    </div>
-
-    <!-- Monetag Rewarded Ad Container -->
-    <div id="ad-box" class="hidden mb-4 p-5 bg-gradient-to-r from-slate-900 to-amber-950 text-white rounded-xl text-center shadow-inner">
-      <div class="inline-block bg-yellow-400 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded mb-2">
-        SPONSORED REWARDED AD (MONETAG)
-      </div>
-      <h3 class="text-sm font-semibold mb-1" id="ad-title">विज्ञापन लोड हो रहा है...</h3>
-      <p class="text-xs text-gray-300 mb-3">कृपया ₹5 अनलॉक करने हेतु विज्ञापन पूरा देखें</p>
-      
-      <!-- Progress Bar -->
-      <div class="w-full bg-gray-700 rounded-full h-2 mb-3 overflow-hidden">
-        <div id="ad-progress" class="bg-amber-400 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-      </div>
-      <span id="ad-timer" class="text-xs font-mono font-bold text-amber-300">5 सेकंड शेष...</span>
-      
-      <button id="ad-skip-btn" class="hidden mt-3 w-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold py-2.5 px-4 rounded-lg text-sm transition">
-        ✅ विज्ञापन पूरा हुआ - अगला सवाल देखें
-      </button>
-    </div>
-
-    <!-- Active Question Container -->
-    <div id="question-box" class="space-y-4">
-      <div class="flex justify-between items-center text-xs font-medium text-gray-500">
-        <span id="q-category" class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md border border-amber-200 font-bold">सामान्य ज्ञान</span>
-        <span id="q-counter" class="font-bold text-amber-600">सवाल 1 / 5</span>
-      </div>
-
-      <h2 id="q-text" class="text-base font-bold text-gray-800 leading-snug">भारत की राजधानी कौन सी है?</h2>
-
-      <div id="options-container" class="space-y-2.5">
-        <!-- Options rendered dynamically -->
-      </div>
-    </div>
-
-    <!-- Highlighted Submit Button (Shown after 5 questions & final rewarded ad) -->
-    <div id="submit-box" class="hidden mt-6 text-center space-y-3">
-      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-emerald-800 text-xs font-bold">
-        🎉 आपने 5 सवाल और सभी विज्ञापन पूरे कर लिए हैं!
-      </div>
-      <button id="submit-btn" class="w-full pulse-glow bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-slate-950 font-black text-lg py-4 px-6 rounded-xl shadow-xl hover:opacity-95 transition">
-        💰 सबमिट करें और ₹5 प्राप्त करें 💰
-      </button>
-    </div>
-
-    <!-- Final Result Screen -->
-    <div id="result-box" class="hidden text-center py-6 space-y-4">
-      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-black">
-        ₹
-      </div>
-      <h2 class="text-2xl font-black text-emerald-600">बधाई हो!</h2>
-      <p class="text-lg font-bold text-gray-800">आपने 5 रुपये कमा लिए हैं।</p>
-      <p class="text-xs text-gray-500">यह राशि आपके दे दना दन टेलीग्राम बॉट खाते में दर्ज कर दी गई है।</p>
-      
-      <a id="bot-redirect-link" href="https://t.me/KamaoNaBot" class="inline-block mt-4 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-md">
-        ✈️ वापस दे दना दन बॉट पर जाएं
-      </a>
-    </div>
-
-  </div>
-
-  <script>
-    const questions = [
-      { q: "भारत की राजधानी कौन सी है?", opts: ["मुंबई", "नई दिल्ली", "कोलकाता", "जयपुर"], cor: 1, cat: "भूगोल" },
-      { q: "क्रिकेट के भगवान के रूप में किसे जाना जाता है?", opts: ["विराट कोहली", "सचिन तेंदुलकर", "एम एस धोनी", "रोहित शर्मा"], cor: 1, cat: "खेल" },
-      { q: "भारत का राष्ट्रीय पशु कौन सा है?", opts: ["शेर", "हाथी", "बाघ (Tiger)", "चीता"], cor: 2, cat: "राष्ट्रीय प्रतीक" },
-      { q: "दीपावली किस खुशी में मनाई जाती है?", opts: ["भगवान राम की अयोध्या वापसी", "शिव पूजा", "होली मिलन", "नववर्ष"], cor: 0, cat: "त्योहार" },
-      { q: "सूर्य की रोशनी से कौन सा विटामिन मिलता है?", opts: ["विटामिन A", "विटामिन B", "विटामिन C", "विटामिन D"], cor: 3, cat: "विज्ञान" }
-    ];
-
-    let currentIdx = 0;
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('userId') || 'user_1';
-
-    function runAd(callback) {
-      const adBox = document.getElementById('ad-box');
-      const qBox = document.getElementById('question-box');
-      const subBox = document.getElementById('submit-box');
-      
-      adBox.classList.remove('hidden');
-      qBox.classList.add('hidden');
-      subBox.classList.add('hidden');
-
-      let remaining = 5;
-      const timer = document.getElementById('ad-timer');
-      const progress = document.getElementById('ad-progress');
-      const skipBtn = document.getElementById('ad-skip-btn');
-      
-      skipBtn.classList.add('hidden');
-      progress.style.width = '0%';
-      timer.innerText = remaining + ' सेकंड शेष...';
-
-      // Trigger Monetag Rewarded Interstitial SDK
-      try {
-        const sdkFunc = window['show_' + ("11672341")];
-        if (typeof sdkFunc === 'function') {
-          sdkFunc().then(() => {
-            remaining = 0;
-            progress.style.width = '100%';
-            timer.innerText = '✅ विज्ञापन पूरा!';
-            skipBtn.classList.remove('hidden');
-          }).catch((err) => console.log('Monetag Notice:', err));
-        }
-      } catch (e) {
-        console.log(e);
-      }
-
-      const interval = setInterval(() => {
-        remaining--;
-        const pct = ((5 - remaining) / 5) * 100;
-        progress.style.width = pct + '%';
+    <div class="max-w-md w-full bg-slate-800 rounded-xl shadow-2xl p-6 border border-slate-700">
+        <h1 class="text-2xl font-bold text-center mb-2">Live Online Chess</h1>
         
-        if (remaining <= 0) {
-          clearInterval(interval);
-          timer.innerText = '✅ विज्ञापन पूरा!';
-          skipBtn.classList.remove('hidden');
-          skipBtn.onclick = () => {
-            adBox.classList.add('hidden');
-            callback();
-          };
-        } else {
-          timer.innerText = remaining + ' सेकंड शेष...';
-        }
-      }, 1000);
-    }
+        <!-- Status & Room Info -->
+        <div class="flex justify-between items-center mb-4 text-sm text-slate-300">
+            <span id="status" class="font-semibold text-emerald-400">Connecting to game...</span>
+            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-medium transition cursor-pointer">
+                Restart Game
+            </button>
+        </div>
 
-    function loadQuestion() {
-      const q = questions[currentIdx];
-      document.getElementById('q-counter').innerText = 'सवाल ' + (currentIdx + 1) + ' / 5';
-      document.getElementById('q-category').innerText = q.cat;
-      document.getElementById('q-text').innerText = q.q;
+        <!-- Chessboard Container -->
+        <div id="board" class="w-full aspect-square flex flex-wrap rounded-lg overflow-hidden border-4 border-slate-700 shadow-inner"></div>
 
-      const optsDiv = document.getElementById('options-container');
-      optsDiv.innerHTML = '';
+        <!-- Instructions -->
+        <p class="text-xs text-slate-400 text-center mt-4">
+            Share this page URL with your friend. Moves sync live instantly!
+        </p>
+    </div>
 
-      q.opts.forEach((opt, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'w-full text-left p-3.5 rounded-xl border border-gray-200 hover:border-amber-400 bg-gray-50/80 font-medium text-sm transition flex items-center justify-between';
-        btn.innerHTML = '<span>' + opt + '</span><span class="text-xs text-gray-400">(' + (idx + 1) + ')</span>';
-        
-        btn.onclick = () => {
-          btn.classList.add('border-emerald-500', 'bg-emerald-50', 'text-emerald-900', 'font-bold');
-          setTimeout(() => {
-            currentIdx++;
-            if (currentIdx < questions.length) {
-              runAd(() => {
-                document.getElementById('question-box').classList.remove('hidden');
-                loadQuestion();
-              });
-            } else {
-              // Final Rewarded Ad before highlighted submit
-              runAd(() => {
-                document.getElementById('question-box').classList.add('hidden');
-                document.getElementById('submit-box').classList.remove('hidden');
-              });
-            }
-          }, 400);
+    <!-- Firebase & Game Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Your Firebase Configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyAjqIzlrb9aq8qtEtYFA9GbDZeiydVvbz4",
+          authDomain: "git9-43302.firebaseapp.com",
+          databaseURL: "https://git9-43302-default-rtdb.firebaseio.com",
+          projectId: "git9-43302",
+          storageBucket: "git9-43302.firebasestorage.app",
+          messagingSenderId: "724237457030",
+          appId: "1:724237457030:web:a65c2756f1aa13503aa307",
+          measurementId: "G-W8Q9T9KRP1"
         };
-        optsDiv.appendChild(btn);
-      });
-    }
 
-    // Start with 1st ad
-    runAd(() => {
-      document.getElementById('question-box').classList.remove('hidden');
-      loadQuestion();
-    });
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const gameRef = ref(db, 'chess_matches/room_1');
 
-    // Handle Submit
-    document.getElementById('submit-btn').onclick = () => {
-      if (typeof confetti === 'function') {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-      }
-      document.getElementById('submit-box').classList.add('hidden');
-      document.getElementById('result-box').classList.remove('hidden');
-    };
-  </script>
+        const chess = new Chess();
+        let selectedSquare = null;
+        let boardElement = document.getElementById('board');
+        let statusElement = document.getElementById('status');
+
+        // Unicode chess symbols mapping
+        const unicodePieces = {
+            p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚',
+            P: '♙', R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔'
+        };
+
+        // Render the board on the UI
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            const board = chess.board();
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const squareId = String.fromCharCode(97 + c) + (8 - r);
+                    const squareDiv = document.createElement('div');
+                    squareDiv.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                    squareDiv.dataset.square = squareId;
+
+                    const piece = board[r][c];
+                    if (piece) {
+                        const pieceSpan = document.createElement('span');
+                        pieceSpan.className = 'piece';
+                        pieceSpan.textContent = unicodePieces[piece.color === 'w' ? piece.type.toUpperCase() : piece.type];
+                        squareDiv.appendChild(pieceSpan);
+                    }
+
+                    if (selectedSquare === squareId) {
+                        squareDiv.classList.add('selected');
+                    }
+
+                    squareDiv.addEventListener('click', () => handleSquareClick(squareId));
+                    boardElement.appendChild(squareDiv);
+                }
+            }
+            updateStatus();
+        }
+
+        // Update status text
+        function updateStatus() {
+            let status = '';
+            let moveColor = chess.turn() === 'w' ? 'White' : 'Black';
+
+            if (chess.in_checkmate()) {
+                status = `Game Over, ${moveColor} is in checkmate!`;
+            } else if (chess.in_draw()) {
+                status = 'Game Over, Drawn!';
+            } else {
+                status = `${moveColor}'s turn`;
+                if (chess.in_check()) {
+                    status += ` (${moveColor} is in CHECK!)`;
+                }
+            }
+            statusElement.textContent = status;
+        }
+
+        // Handle square selection & moves
+        function handleSquareClick(square) {
+            if (selectedSquare === null) {
+                const piece = chess.get(square);
+                if (piece && piece.color === chess.turn()) {
+                    selectedSquare = square;
+                    renderBoard();
+                }
+            } else {
+                const move = chess.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q' // auto promote to queen for simplicity
+                });
+
+                selectedSquare = null;
+
+                if (move) {
+                    // Push the new FEN state to Firebase
+                    set(gameRef, {
+                        fen: chess.fen(),
+                        lastUpdated: Date.now()
+                    });
+                } else {
+                    // If invalid move, check if user clicked another own piece to switch selection
+                    const piece = chess.get(square);
+                    if (piece && piece.color === chess.turn()) {
+                        selectedSquare = square;
+                    }
+                }
+                renderBoard();
+            }
+        }
+
+        // Listen for live changes from Firebase
+        onValue(gameRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.fen) {
+                if (data.fen !== chess.fen()) {
+                    chess.load(data.fen);
+                    selectedSquare = null;
+                    renderBoard();
+                }
+            } else {
+                // Initialize room if empty
+                set(gameRef, { fen: chess.fen(), lastUpdated: Date.now() });
+            }
+        });
+
+        // Restart button handler
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            if (confirm("Are you sure you want to restart the game?")) {
+                chess.reset();
+                set(gameRef, {
+                    fen: chess.fen(),
+                    lastUpdated: Date.now()
+                });
+            }
+        });
+    </script>
 </body>
 </html>
