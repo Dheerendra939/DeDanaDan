@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Online Chess - Firestore</title>
+    <title>Live Online Chess - Fullscreen</title>
     <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Chess.js for game logic and rule validation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
         .piece {
-            font-size: clamp(2.2rem, 9vw, 4rem);
+            font-size: clamp(2rem, 9.5vw, 4.5rem);
             cursor: pointer;
             user-select: none;
             transition: transform 0.08s ease;
@@ -31,29 +31,31 @@
         .selected { background-color: #7b61ff !important; }
     </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+<body class="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 select-none">
 
-    <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-4 sm:p-6 border border-slate-700 flex flex-col items-center">
-        <h1 class="text-xl sm:text-2xl font-bold text-center mb-1">Live Online Chess</h1>
-        
-        <!-- Connection Status & Ping Counter -->
-        <div class="w-full flex justify-between items-center mb-3 text-xs sm:text-sm text-slate-300 px-1">
-            <span id="status" class="font-semibold text-emerald-400">Ready to play</span>
-            <div class="bg-slate-700 px-2 py-1 rounded text-slate-200 border border-slate-600">
+    <!-- Top Header / Status bar -->
+    <div class="w-full max-w-lg flex flex-col gap-1 px-1">
+        <div class="flex justify-between items-center">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight">Live Chess</h1>
+            <div class="bg-slate-800 px-2.5 py-1 rounded-md text-xs sm:text-sm text-slate-200 border border-slate-700">
                 DB Pings: <span id="pingCount" class="font-bold text-amber-400">0</span>
             </div>
         </div>
-
-        <!-- Chessboard Container (Maximum responsive width) -->
-        <div id="board" class="w-full max-w-[440px] aspect-square flex flex-wrap rounded-lg overflow-hidden border-4 border-slate-700 shadow-inner"></div>
-
-        <!-- Controls -->
-        <div class="w-full flex justify-between items-center mt-4 px-1">
-            <p class="text-xs text-slate-400">Share link with friend to play.</p>
-            <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-medium transition cursor-pointer shadow">
-                Restart Game
-            </button>
+        <div class="flex justify-between items-center text-xs sm:text-sm">
+            <span id="status" class="font-semibold text-emerald-400">Ready to play</span>
+            <span class="text-slate-400 text-xs">Share link to play</span>
         </div>
+    </div>
+
+    <!-- Chessboard Container (Fit screen, full width, perfectly square) -->
+    <div class="w-full max-w-[min(92vw,520px)] aspect-square flex flex-wrap rounded-xl overflow-hidden border-4 border-slate-800 shadow-2xl my-2" id="board"></div>
+
+    <!-- Bottom Controls -->
+    <div class="w-full max-w-lg flex justify-between items-center px-1 pb-1">
+        <p class="text-xs text-slate-400">Moves sync automatically.</p>
+        <button id="restartBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer shadow-lg active:scale-95">
+            Restart Game
+        </button>
     </div>
 
     <!-- Firebase Firestore & Game Logic -->
@@ -82,7 +84,7 @@
         const chess = new Chess();
         let selectedSquare = null;
         let currentTouchCount = 0;
-        let isLocallyMoving = false; // Prevents snapshot jitter during local clicks
+        let isLocallyMoving = false;
 
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status');
@@ -158,18 +160,15 @@
                     promotion: 'q'
                 });
 
-                const previousSelection = selectedSquare;
                 selectedSquare = null;
 
                 if (move) {
-                    // 1. Instantly redraw locally so there is zero delay for the moving player
                     renderBoard();
 
                     try {
                         isLocallyMoving = true;
                         currentTouchCount++;
                         
-                        // 2. Push update to Firestore in background
                         await setDoc(gameDocRef, {
                             fen: chess.fen(),
                             lastUpdated: Date.now(),
@@ -181,11 +180,9 @@
                         console.error("Error writing move to Firestore:", error);
                         alert("Failed to sync move to database.");
                     } finally {
-                        // Release lock after a brief moment
                         setTimeout(() => { isLocallyMoving = false; }, 300);
                     }
                 } else {
-                    // If clicked another valid piece of own color, switch selection
                     const piece = chess.get(square);
                     if (piece && piece.color === chess.turn()) {
                         selectedSquare = square;
@@ -208,7 +205,6 @@
                     });
                 }
 
-                // Setup live listener for remote changes from your friend
                 onSnapshot(gameDocRef, (docSnapshot) => {
                     if (docSnapshot.exists() && !isLocallyMoving) {
                         const data = docSnapshot.data();
@@ -218,7 +214,6 @@
                             pingCountElement.textContent = currentTouchCount;
                         }
 
-                        // Only update board if the remote FEN differs from ours
                         if (data.fen && data.fen !== chess.fen()) {
                             chess.load(data.fen);
                             selectedSquare = null;
@@ -262,10 +257,8 @@
             }
         });
 
-        // 1. Initial local render
+        // Initial render & connection
         renderBoard();
-
-        // 2. Connect Firestore listener
         initFirestore();
     </script>
 </body>
